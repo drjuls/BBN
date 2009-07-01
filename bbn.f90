@@ -112,7 +112,8 @@ SUBROUTINE GetLinearResponse
     use variables
 
     INTEGER :: i, j
-    REAL :: lnvar, lnvar_step
+!    REAL :: lnvar, lnvar_step
+    REAL:: lnvar_step
     INTEGER, PARAMETER :: numsteps = 31
     REAL, DIMENSION(numsteps, 6) :: lnY
     REAL :: dlnYdlnX, X0
@@ -195,14 +196,13 @@ SUBROUTINE VaryLightQuarkMass
     INTEGER :: i, j
     REAL :: ln_mq, ln_mq_step   ! d(m_q)/m_q and its step size
     INTEGER, PARAMETER :: numsteps = 41
+    REAL :: binding_energy
 
     OPEN (unit=7, file='bbn.dat', status='unknown')
     !write (7, "('m_q, T9, D, 3He, 4He, 6Li, 7Li')")
 
     ln_mq = -0.01
     ln_mq_step = 0.04 / (numsteps - 1)
-
-    X0 = 1.
 
     DO i = 1, numsteps
         ! Reset to SBBN values

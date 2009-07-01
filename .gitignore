@@ -1,4 +1,5 @@
 *.[oa]
-*.dat
 *.mod
-
+*.exe
+*.dat
+*.txt
