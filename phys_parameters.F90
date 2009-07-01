@@ -37,7 +37,8 @@ MODULE physics_parameters
     REAL, SAVE, DIMENSION(nnuc) :: &
             am, &       !Atomic number of nuclide.
             zm, &       !Charge of nuclide.
-            dm          !Mass excess of nuclide.
+            dm, &       !Mass excess of nuclide (amu)
+            km          !Mass excess of nuclide (keV)
 
     INTEGER, PARAMETER :: nrec = 88     !Number of nuclear reactions.
 
@@ -52,6 +53,7 @@ MODULE physics_parameters
             rev, &          !Reverse reaction coefficient.
             q9              !Energy released in reaction (in 10**9 K).
     REAL, SAVE, DIMENSION(nrec) :: &
+            EgIn, &         !Gamow energy of entrance channel (in 10**9 K).
             EgOut           !Gamow energy of exit channel (in 10**9 K).
 
     !Initial reaction parameter values.
@@ -80,6 +82,11 @@ MODULE physics_parameters
                .016004,.016929,.022487,.024609,.012186,.012939,.009305, &
                .011432,.014354,.000000,.018641,.003354,.005738,.003242, &
                .003074,.008597,.000108,.003070,-.005085/
+      DATA km /8071.31710,7288.97050,13135.72158,14949.80600,14931.21475,2424.91565, &
+               14086.793,14908.141,15770.034,20946.844,22921.490,11347.648, &
+               12050.731,8667.931,10650.342,13368.899,0.0,17338.082, &
+               3125.01129,5345.481,3019.89305,2863.41704,8007.356,101.43805, &
+               2855.605,-4737.00141/
 
       ! Number of nuclides in reaction types 1-11
       DATA si /1.,1.,1.,1.,1.,2.,3.,2.,1.,1.,2./
@@ -132,7 +139,7 @@ MODULE physics_parameters
 #if rates_1999
                   23.,3., 7.,2.,5., 6., 1.067,  46.641, &  !Li6(p,a)He3
                   24.,5., 8.,2.,0., 6., 4.676, 201.30 , &  !Li7(p,a)He4
-                  25.,2., 6.,3.,0., 7., 1.53 ,  17.118, &  !H2(a,p)Li6  (unchanged)
+                  25.,2., 6.,3.,0., 7., 1.53 ,  17.118, &  !H2(a,g)Li6  (unchanged)
                   26.,2., 6.,4.,0., 8., 1.11 ,  28.640, &  !H3(a,g)Li7  (unchanged)
                   27.,2., 6.,5.,0., 9., 1.11 ,  18.423, &  !He3(a,g)Be7 (unchanged)
                   28.,6., 3.,0.,1., 5., 1.73 ,  37.935, &  !H2(d,n)He3  (unchanged)
@@ -143,7 +150,7 @@ MODULE physics_parameters
 #elif rates_1992
                   23.,3., 7.,2.,5., 6., 1.07 ,  46.631, &  !Li6(p,a)He3
                   24.,5., 8.,2.,0., 6., 4.69 , 201.291, &  !Li7(p,a)He4
-                  25.,2., 6.,3.,0., 7., 1.53 ,  17.118, &  !H2(a,p)Li6
+                  25.,2., 6.,3.,0., 7., 1.53 ,  17.118, &  !H2(a,g)Li6
                   26.,2., 6.,4.,0., 8., 1.11 ,  28.640, &  !H3(a,g)Li7
                   27.,2., 6.,5.,0., 9., 1.11 ,  18.423, &  !He3(a,g)Be7
                   28.,6., 3.,0.,1., 5., 1.73 ,  37.935, &  !H2(d,n)He3
@@ -265,9 +272,6 @@ MODULE physics_parameters
 CONTAINS
 
     SUBROUTINE ResetPhysicsParameters
-        INTEGER :: i
-        REAL :: GamowPrefactor
-        INTEGER :: nuc1, nuc2
 
         pi = 2.0 * acos(0.0)
         alpha = 1./137.035999679
@@ -289,35 +293,6 @@ CONTAINS
         !   BBN 1992 value: eta = 3.162e-10
         !   WMAP 3 value:   eta = 6.14(25)e-10
         !   WMAP 5 value:   eta = 6.23(17)e-10
-
-        !Gamow energy Eg = 2 pi^2 alpha^2 mu A (Z_1 Z_2)^2
-        GamowPrefactor = 2. * pi**2 * alpha**2 * amu_MeV
-        EgOut = 0.0
-
-        ! Set reaction rates to default values
-        DO i  = 1,nrec
-            iform(i) = int(reacpr(i,2))!Reaction type.
-            ii(i)    = int(reacpr(i,3))!Incoming nuclide type.
-            jj(i)    = int(reacpr(i,4))!Incoming nuclide type.
-            kk(i)    = int(reacpr(i,5))!Outgoing nuclide type.
-            ll(i)    = int(reacpr(i,6))!Outgoing nuclide type.
-            rev(i)   = reacpr(i,7)     !Reverse reaction coefficient.
-            q9(i)    = reacpr(i,8)     !Energy released.
-
-            nuc1 = 0
-            nuc2 = 0
-            if((iform(i) .eq. 3) .or. (iform(i) .eq. 6)) then
-                nuc1 = kk(i)
-                nuc2 = ll(i)
-            else if(iform(i) .eq. 5) then
-                nuc1 = ll(i)
-                nuc2 = ll(i)
-            end if
-            if((nuc1.ne.0) .and. (nuc2.ne.0)) then
-                EgOut(i) = GamowPrefactor * (zm(nuc1) * zm(nuc2))**2 / &
-                    (1./(am(nuc1)+dm(nuc1)) + 1./(am(nuc2)+dm(nuc2)))
-            end if
-        END DO
 
     END SUBROUTINE ResetPhysicsParameters
 

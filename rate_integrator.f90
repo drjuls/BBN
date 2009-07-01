@@ -67,12 +67,13 @@ MODULE rate_integrator
     real, save, private :: RRatePrefactor
 
     ! These are needed to pass reaction parameters and temperature to function
+    integer, save, private :: reaction_number
     real, save, private, dimension(maxparam) :: f_params
     real, save, private :: f_kT
 
     ! Variation parameters
-    logical, private, parameter :: shift_whole_cross_section = .true.
-    real, save, private :: delta_Er
+    logical, private, parameter :: shift_whole_cross_section = .false.
+    real, save, private, dimension(nspecial) :: delta_Er
 
 CONTAINS
 
@@ -129,7 +130,7 @@ CONTAINS
         Sparameters(7, pEmax) = 0.7
 
         !  8  3He(a,g)7Be
-        Stype(8) = 2
+        Stype(8) = 4
         Sparameters(8, pS0:pS0+4) = (/0.3861e-3, 0.8195, -2.194, 1.419, -0.2780/)
         Sparameters(8, pEmax) = 2.0
 
@@ -185,7 +186,7 @@ CONTAINS
         if(Stype(reaction) .ne. 3) then
             print *, "VaryResonance: reaction is wrong type. Reaction = ", reaction
         else if(shift_whole_cross_section) then
-            delta_Er = dEr
+            delta_Er(reaction) = dEr
         else
             Sparameters(reaction, pEr) = Sparameters(reaction, pEr) + dEr
             Sparameters(reaction, pG) = Sparameters(reaction, pG) + dG
@@ -214,6 +215,7 @@ CONTAINS
         lenw = 4 * iwork_size
 
         ! Do integration and get rate
+        reaction_number = reaction
         f_params = Sparameters(reaction,:)
         f_kT = kB * temp
 
@@ -227,6 +229,11 @@ CONTAINS
         case (3)
             call dqagi(f3, 0., 1, epsabs, epsrel, integral, abserr, neval, &
                        ierr, limit, lenw, last, iwork, work)
+        case (4)
+            if(reaction .eq. 8) then
+            call dqagi(f_reaction8, 0., 1, epsabs, epsrel, integral, abserr, neval, &
+                       ierr, limit, lenw, last, iwork, work)
+            end if
         end select
         if(ierr .gt. 0 .and. ierr .ne. 2) then
             print *, "RateIntegrator::GetRate: dqagi failed"
@@ -287,7 +294,6 @@ CONTAINS
 
         ! Gamow factor uses actual x
         f2 = f2 * exp(-sqrt(f_params(pEg)/x) - x/f_kT)
-        return
     END FUNCTION
 
     REAL FUNCTION f3(x)
@@ -297,7 +303,7 @@ CONTAINS
         integer :: power
         real :: xeff, xcs
 
-        xeff = x - delta_Er
+        xeff = x - delta_Er(reaction_number)
         if(xeff .lt. 0.0) then
             xcs = 0.0
         else if(xeff .lt. f_params(pEmax)) then
@@ -319,6 +325,38 @@ CONTAINS
         f3 = f3 / (1. + ((xeff - f_params(pEr))/(f_params(pG)/2.))**2)
     END FUNCTION
 
+    REAL FUNCTION f_reaction8(x)
+    ! Special function: 3He + 4He -> 7Be + gamma
+        real, intent(in) :: x
+        
+        integer :: power
+        real :: xeff, xoverEg
+
+        ! Two dimensions are ground and excited parts
+        real, dimension(2) :: total, Q, s0, s2, a
+        Q  = (/1.5861, 1.1570/)
+        s0 = (/0.406, 0.163/)
+        s2 = (/0.007, 0.004/)
+        a  = (/-0.203, -0.127/)
+
+        if(x .lt. f_params(pEmax)) then
+            xeff = x
+        else
+            xeff = f_params(pEmax)
+        end if
+        
+        xoverEg = xeff/f_params(pEg)
+
+        total = Q / (xeff + Q)
+        total = total * (s0 * (1. + a * xeff)**2 &
+                         + s2 * (1. + 4. * pi**2 * xoverEg) * (1. + 16. * pi**2 * xoverEg))
+
+        f_reaction8 = (total(1) + total(2))/1000.
+
+        ! Gamow factor uses actual x
+        f_reaction8 = f_reaction8 * exp(-sqrt(f_params(pEg)/x) - x/f_kT)
+    END FUNCTION
+
     REAL FUNCTION f_reaction10(x)
     ! Special function: 7Be + n -> 7Li + p
         real, intent(in) :: x
@@ -337,7 +375,7 @@ CONTAINS
         real, dimension(2) :: ResWidths    = (/0.20, 1.9/)
         real, dimension(2) :: ResHeights   = (/1.0553e9, 2.0364e9/)
 
-        xeff = x - delta_Er
+        xeff = x - delta_Er(10)
         if(xeff .lt. 0.0) then
             xcs = 0.0
         else if(xeff .lt. f_params(pEmax)) then
@@ -359,6 +397,7 @@ CONTAINS
 
         f_reaction10 = f_reaction10 * sqrt(x) * exp(-x/f_kT)
     END FUNCTION
+
 
     SUBROUTINE Trapezoidal(func, integral)
         real, external :: func

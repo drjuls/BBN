@@ -1515,7 +1515,6 @@ C10-----OPEN FILE---------------------------------------
         OPEN (unit=21, file='Li7_destruction.txt',  status='unknown')
         OPEN (unit=22, file='Be7_creation.txt',  status='unknown')
         OPEN (unit=23, file='Be7_destruction.txt',  status='unknown')
-        
       END IF
       
       IF (itime.eq.3) THEN
@@ -1580,7 +1579,7 @@ c     Be7 destruction
       END IF
 
       IF (itime.eq.8) THEN         !Right after a run.
-!        xout(it,8) = xout(it,8) + xout(it,9)  !Add beryllium to lithium (electron-capture, half-life = 53 days)
+        xout(it,8) = xout(it,8) + xout(it,9)  !Add beryllium to lithium (electron-capture, half-life = 53 days)
         xout(it,5) = xout(it,5) + xout(it,4)  !Add tritium to helium-3 (beta-dacay, half-life = 12.33 y)
         !xout(it,6) = xout(it,6)-0.0025
                   !Radiative, coulomb, finite-temperature corrections (Ref 1).

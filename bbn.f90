@@ -6,6 +6,7 @@ PROGRAM bbn
     use variables
     
     INTEGER :: i, j
+    REAL :: ln_mq
 
 !..........SET OUTPUT OPTION TO DEFAULT.
     nout    = 0                  !No output requests.
@@ -31,6 +32,11 @@ PROGRAM bbn
     if(.false.) then
         call InitialiseReactions
 !        call SetDeutronBindingVariation(-0.538)
+!        CALL SetHe5ResonancePositions(0.1)
+
+        ln_mq = 0.027
+        !CALL SetDeutronBindingVariation(ln_mq * (-1.39) * 25.8)   ! AV18
+        !CALL SetHe5ResonancePositions(ln_mq * 17.59) ! delta E_r in MeV
 
         itime = 3       !Time = before computation
         CALL check
@@ -41,7 +47,7 @@ PROGRAM bbn
         CALL check
 
         print *, it
-        write (*, "(1p8(e14.5))") t9out(it), (xout(it,3)), (xout(it,5)), &
+        write (*, "(1p8(e14.5))") t9out(it), (xout(it,3)), (xout(it,4)), (xout(it,5)), &
                                   (xout(it,6)), (xout(it,7)), (xout(it,8)), (xout(it,9))
     end if
 
@@ -106,16 +112,15 @@ SUBROUTINE GetLinearResponse
     use variables
 
     INTEGER :: i, j
-!    REAL :: lnvar, lnvar_step
-    REAL:: lnvar_step
-    INTEGER, PARAMETER :: numsteps = 21
+    REAL :: lnvar, lnvar_step
+    INTEGER, PARAMETER :: numsteps = 31
     REAL, DIMENSION(numsteps, 6) :: lnY
     REAL :: dlnYdlnX, X0
 
     OPEN (unit=7, file='bbn.dat', status='unknown')
     write (7, "('eta  var  D  3He  4He  6Li  7Li  7Be  7Li+7Be')")
 
-    lnvar = -0.25
+    lnvar = -0.3
     lnvar_step = 2.0 * abs(lnvar) / (numsteps - 1)
 !    lnvar = -1.82
 !    lnvar_step = 0.2
@@ -134,7 +139,7 @@ SUBROUTINE GetLinearResponse
 !        CALL SetDeutronBindingVariation(lnvar)
 !        CALL SetBindingVariation(4, lnvar)
 !        c(2) = 889.0 * (1.0 + lnvar)
-        CALL SetHe5ResonancePositions(lnvar)
+        CALL SetLi5ResonancePositions(lnvar)
 
         itime = 3       !Time = before computation
         CALL check
@@ -144,15 +149,16 @@ SUBROUTINE GetLinearResponse
         itime = 8       !Time = after computation
         CALL check
 
-        ! dQ, T9, D, 4He, 7Li, 7Be
-        write (*, "(1p6(e14.5))") lnvar, t9out(it), xout(it,3), xout(it,6), xout(it,8), xout(it,9)
+        ! dQ, T9, D, 3He, 4He, 7Li, 7Be
+        write (*, "(1p7(e14.5))") lnvar, t9out(it), xout(it,3), xout(it,5), xout(it,6), xout(it,8), xout(it,9)
 
         ! eta, dQ, D, 3He, 4He, 6Li, 7Li, 7Be, 7Li+7Be
-!        write (7, "(1p7(e14.5))") lnvar, log(xout(it,3)), log(xout(it,5)), &
-!                                  log(xout(it,6)), log(xout(it,7)), log(xout(it,8)), log(xout(it,9))
-        write (7, "(1p9(e14.5))") eta*1.e10, lnvar, xout(it,3)*1.e5, xout(it,5)*1.e6, xout(it,6), &
-                                  xout(it,7)*1.e14, xout(it,8)*1.e10, xout(it,9)*1.e10, &
-                                  (xout(it,8) + xout(it,9))*1.e10
+        write (7, "(1p9(e14.5))") eta, lnvar, (xout(it,3)), (xout(it,5)), &
+                                  (xout(it,6)), (xout(it,7)), (xout(it,8)), (xout(it,9)), &
+                                  (xout(it,8) + xout(it,9))
+!        write (7, "(1p9(e14.5))") eta*1.e10, lnvar, xout(it,3)*1.e5, xout(it,5)*1.e6, xout(it,6), &
+!                                  xout(it,7)*1.e14, xout(it,8)*1.e10, xout(it,9)*1.e10, &
+!                                  (xout(it,8) + xout(it,9))*1.e10
 
         lnY(i, 1) = log(xout(it,3))
         lnY(i, 2) = log(xout(it,5))
@@ -180,40 +186,50 @@ SUBROUTINE VaryLightQuarkMass
     ! Get response to variation of light quark mass, m_q
     !   d(ln Y_i)/d(ln m_q),
     ! where i is (D, 3He, 4He, 6Li, 7Li)
+    use physics_parameters
     use scalarfield_module
     use computational_parameters
     use reactions_module
     use variables
 
     INTEGER :: i, j
-!    REAL :: lnvar, lnvar_step
-    REAL :: lnvar_step
-    INTEGER, PARAMETER :: numsteps = 1!31
-    REAL, DIMENSION(numsteps, 5) :: lnY
-    REAL :: dlnYdlnX, X0
+    REAL :: ln_mq, ln_mq_step   ! d(m_q)/m_q and its step size
+    INTEGER, PARAMETER :: numsteps = 41
 
-    OPEN (unit=7, file='Dtest.dat', status='unknown')
+    OPEN (unit=7, file='bbn.dat', status='unknown')
     !write (7, "('m_q, T9, D, 3He, 4He, 6Li, 7Li')")
 
-    lnvar = 0.01
-    lnvar_step = 0.03! / (numsteps - 1)
-!    lnvar_step = 2.0 * abs(lnvar) / (numsteps - 1)
+    ln_mq = -0.01
+    ln_mq_step = 0.04 / (numsteps - 1)
+
     X0 = 1.
 
     DO i = 1, numsteps
         ! Reset to SBBN values
         CALL InitialiseReactions
 
-        !CALL SetDeutronBindingVariation(lnvar * (-0.75) * 25.8)   ! AV28
-        CALL SetDeutronBindingVariation(lnvar * (-1.39) * 25.8)   ! AV18
-        CALL SetBindingVariation(4, lnvar * (-1.44) * 98.39)  ! 3H = T
-        CALL SetBindingVariation(5, lnvar * (-1.55) * 89.53)  ! 3He
-        CALL SetBindingVariation(6, lnvar * (-1.08) * 328.2)  ! 4He
-        CALL SetBindingVariation(7, lnvar * (-1.36) * 371.1)  ! 6Li
-        CALL SetBindingVariation(8, lnvar * (-1.50) * 455.2)  ! 7Li
-        CALL SetBindingVariation(9, lnvar * (-1.57) * 436.2)  ! 7Be
-        CALL SetBindingVariation(12, lnvar * (-1.59) * 674.7) ! 9Be
-!        c(2) = 889.0 * (1.0 + lnvar)
+        !CALL SetDeutronBindingVariation(ln_mq * (-0.75) * 25.8)   ! AV28
+        CALL SetDeutronBindingVariation(ln_mq * (-1.39) * 25.8)   ! AV18
+        CALL SetBindingVariation(4, ln_mq * (-1.44) * 98.39)  ! 3H = T
+        CALL SetBindingVariation(5, ln_mq * (-1.55) * 89.53)  ! 3He
+        CALL SetBindingVariation(6, ln_mq * (-1.08) * 328.2)  ! 4He
+        CALL SetBindingVariation(7, ln_mq * (-1.36) * 371.1)  ! 6Li
+        CALL SetBindingVariation(8, ln_mq * (-1.50) * 455.2)  ! 7Li
+        CALL SetBindingVariation(9, ln_mq * (-1.57) * 436.2)  ! 7Be
+        do j = 10, 11
+            binding_energy = (zm(j)*km(2) + (am(j)-zm(j))*km(1) - km(j))/1000./kB
+            CALL SetBindingVariation(j, ln_mq * (-1.45) * binding_energy)
+        end do
+        CALL SetBindingVariation(12, ln_mq * (-1.59) * 674.7) ! 9Be
+        do j = 13, 26
+            binding_energy = (zm(j)*km(2) + (am(j)-zm(j))*km(1) - km(j))/1000./kB
+            CALL SetBindingVariation(j, ln_mq * (-1.45) * binding_energy)
+        end do
+
+        CALL SetLi5ResonancePositions(ln_mq * 17.59) ! delta E_r in MeV
+        CALL SetHe5ResonancePositions(ln_mq * 18.68) ! delta E_r in MeV
+!        CALL SetLi5ResonancePositions(ln_mq * 7.32) ! delta E_r in MeV
+!        CALL SetHe5ResonancePositions(ln_mq * 8.29) ! delta E_r in MeV
 
 !        CALL PrintQValues
 
@@ -225,30 +241,17 @@ SUBROUTINE VaryLightQuarkMass
         itime = 8       !Time = after computation
         CALL check
 
-        ! dQ, T9, D, 4He, 7Li
-!        write (7, "(1p5(e14.5))") lnvar+25.82, t9out(it), xout(it,3), xout(it,6), xout(it,8)
-
-        ! dQ, T9, D, 3He, 4He, 6Li, 7Li
-        write (7, "(1p7(e14.5))") lnvar, t9out(it), (xout(it,3)), (xout(it,5)), &
+        ! d(m_q)/m_q, T9, D, 3He, 4He, 6Li, 7Li
+        write (7, "(1p7(e14.5))") ln_mq, (xout(it,3)), (xout(it,5)), &
                                   (xout(it,6)), (xout(it,7)), (xout(it,8))
 
-        write (*, "(1p7(e14.5))") lnvar, t9out(it), (xout(it,3)), (xout(it,5)), &
-                                  (xout(it,6)), (xout(it,7)), (xout(it,8))
+        write (*, "(1p9(e14.5))") ln_mq, t9out(it), (xout(it,3)), (xout(it,4)), (xout(it,5)), &
+                                  (xout(it,6)), (xout(it,7)), (xout(it,8)), (xout(it,9))
 
-        lnY(i, 1) = log(xout(it,3))
-        lnY(i, 2) = log(xout(it,5))
-        lnY(i, 3) = log(xout(it,6))
-        lnY(i, 4) = log(xout(it,7))
-        lnY(i, 5) = log(xout(it,8))
-
-        lnvar = lnvar + lnvar_step
+        ln_mq = ln_mq + ln_mq_step
     END DO
-    
+    write (7, "('m_q, D, 3He+T, 4He, 6Li, 7Li+7Be')")
+
     CLOSE (unit=7, status='keep')
 
-!    DO i = 1, 5
-!        dlnYdlnX = (2./3.*(lnY(4,i) - lnY(2,i)) - 1./12.*(lnY(5,i) - lnY(1,i)))/lnvar_step * X0
-!        write(*, "(i2, ' dlnY/dlnX = ', f8.3, ' (', f7.5,')'))") &
-!            i, dlnYdlnX, abs((lnY(5,i) - lnY(1, i))/4./lnvar_step*X0 - dlnYdlnX) 
-!    END DO
 END SUBROUTINE

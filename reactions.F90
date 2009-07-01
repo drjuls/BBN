@@ -28,7 +28,7 @@ MODULE reactions_module
 #define rate27_2008_refit 1
 
 ! Integrate the cross-section explicitly for each value of T
-#define integrate_rates 0
+#define integrate_rates 1
 #if integrate_rates
     use rate_integrator
 !  1    p(n,g)d
@@ -55,7 +55,7 @@ MODULE reactions_module
 #define integrate_24 0
 #endif
 
-#define linear_q_variation 1
+#define linear_q_variation 0
 #define include_gamow_shift 1
 
     use physics_parameters
@@ -85,6 +85,9 @@ CONTAINS
     SUBROUTINE InitialiseReactions
         ! Read in reaction parameters and set rates to zero
         INTEGER :: i
+        REAL :: GamowPrefactor, newQ
+        INTEGER :: nuc1, nuc2
+
         f = 0.                 !Forward rate coeff.
         r = 0.                 !Reverse rate coeff.
         DeutronBindingVariation = 0.0
@@ -92,6 +95,65 @@ CONTAINS
 #if integrate_rates
         CALL InitialiseRateIntegrator
 #endif
+        !Gamow energy Eg = 2 pi^2 alpha^2 mu A (Z_1 Z_2)^2
+        GamowPrefactor = 2. * pi**2 * alpha**2 * amu_MeV / kB
+        EgIn  = 0.0
+        EgOut = 0.0
+
+        ! Set reaction rates to default values
+        DO i  = 1,nrec
+            iform(i) = int(reacpr(i,2))!Reaction type.
+            ii(i)    = int(reacpr(i,3))!Incoming nuclide type.
+            jj(i)    = int(reacpr(i,4))!Incoming nuclide type.
+            kk(i)    = int(reacpr(i,5))!Outgoing nuclide type.
+            ll(i)    = int(reacpr(i,6))!Outgoing nuclide type.
+            rev(i)   = reacpr(i,7)     !Reverse reaction coefficient.
+            q9(i)    = reacpr(i,8)     !Energy released.
+
+            ! EgIn
+            nuc1 = 0
+            nuc2 = 0
+            select case (iform(i))
+            case (2, 3, 5, 9, 10)
+                nuc1 = ii(i)
+                nuc2 = jj(i)
+            case (6, 11)
+                nuc1 = ii(i)
+                nuc2 = ii(i)
+            end select
+            if((nuc1.ne.0) .and. (nuc2.ne.0)) then
+                EgIn(i) = GamowPrefactor * (zm(nuc1) * zm(nuc2))**2 / &
+                    (1./(am(nuc1)+dm(nuc1)) + 1./(am(nuc2)+dm(nuc2)))
+            end if
+
+            ! EgOut
+            nuc1 = 0
+            nuc2 = 0
+            select case (iform(i))
+            case (3, 6)
+                nuc1 = kk(i)
+                nuc2 = ll(i)
+            case (4, 5)
+                nuc1 = ll(i)
+                nuc2 = ll(i)
+            end select
+            if((nuc1.ne.0) .and. (nuc2.ne.0)) then
+                EgOut(i) = GamowPrefactor * (zm(nuc1) * zm(nuc2))**2 / &
+                    (1./(am(nuc1)+dm(nuc1)) + 1./(am(nuc2)+dm(nuc2)))
+!                print *, i, EgOut(i)/q9(i)
+            end if
+
+            ! Check q values
+            newQ = si(iform(i))*km(ii(i)) - sl(iform(i))*km(ll(i))
+            if(sj(iform(i)).ne.0) newQ = newQ + sj(iform(i))*km(jj(i))
+            if(sk(iform(i)).ne.0) newQ = newQ - sk(iform(i))*km(kk(i))
+            newQ = newQ /1000.0 / kB
+            
+!            if(abs(newQ - q9(i)) .gt. 0.01) then
+!                print *, i, q9(i), (q9(i)-newQ), (q9(i)-newQ)/newQ
+!            end if
+        END DO
+
         CALL InitialiseMaxima
     END SUBROUTINE InitialiseReactions
 
@@ -224,23 +286,46 @@ CONTAINS
             if(ii(reaction).eq.element) then
                 q9(reaction) = q9(reaction) &
                     - si(iform(reaction)) * dQ
-!                print *, reaction, -si(iform(reaction))
             else if(jj(reaction).eq.element) then
                 q9(reaction) = q9(reaction) &
                     - sj(iform(reaction)) * dQ
-!                print *, reaction, -sj(iform(reaction))
             else if(kk(reaction).eq.element) then
                 q9(reaction) = q9(reaction) &
                     + sk(iform(reaction)) * dQ
-!                print *, reaction, sk(iform(reaction))
             else if(ll(reaction).eq.element) then
                 q9(reaction) = q9(reaction) &
                     + sl(iform(reaction)) * dQ
-!                print *, reaction, sl(iform(reaction))
             end if
-            if(q9(reaction).lt.0.0) &
-                print *, reaction, q9(reaction), reacpr(reaction, 8)
+            ! Print relative change in Q
+            if(element.eq.0 .and. q9(reaction).ne.reacpr(reaction, 8)) then
+                select case (iform(reaction))
+                case (3, 4, 5, 6)
+                    print *, reaction, reacpr(reaction, 8), (q9(reaction)/reacpr(reaction, 8)-1.)*100. &
+                           , sqrt(EgOut(reaction)/reacpr(reaction, 8))
+                case (1, 2, 7, 8)
+                    print *, reaction, reacpr(reaction, 8), (q9(reaction)/reacpr(reaction, 8)-1.)*100.
+                end select
+            end if
         end do
+
+        ! Print percentage changes in forward reaction rates
+        IF (element.eq.0) then
+        DO reaction = 12, 34
+            IF (q9(reaction) /= reacpr(reaction, 8)) THEN
+                select case (iform(reaction))
+                case (3, 4, 5, 6)
+#if include_gamow_shift
+                    print *, reaction, 0.5 * (1. + sqrt(EgOut(reaction)/reacpr(reaction, 8))) &
+                                  * (q9(reaction) - reacpr(reaction, 8))/reacpr(reaction, 8) * 100.
+#else
+                    print *, reaction, 0.5 * (q9(reaction) - reacpr(reaction, 8))/reacpr(reaction, 8) * 100.
+#endif
+                case (1, 2, 7, 8)
+                    print *, reaction, 3.0 * (q9(reaction) - reacpr(reaction, 8))/reacpr(reaction, 8) * 100.
+                end select
+            END IF
+        END DO
+        END IF
     END SUBROUTINE
 
 
@@ -251,6 +336,11 @@ CONTAINS
 #if integrate_30
         call VaryResonance(6, dEr, 0.0)
 #endif
+    END SUBROUTINE
+
+    SUBROUTINE SetLi5ResonancePositions(dEr)
+        ! Shift resonances due to Li5
+        REAL, INTENT(IN) :: dEr
 !  7  3He(d,p)4He
 #if integrate_31
         call VaryResonance(7, dEr, 0.0)
@@ -518,8 +608,8 @@ CONTAINS
                  /(1. +0.255059*t923 + 0.338573*t943)
 #elif rate27_2008_refit
         f(27)  = 6015602. * t9m23 * exp(-12.82707707/t913) &
-                 *(1. +0.420165*t923 +0.238777*t943) &
-                 /(1. +0.693479*t923 +0.508344*t943)
+                 *(1. +0.454877*t923 +0.244011*t943) &
+                 /(1. +0.727006*t923 +0.527836*t943)
 #elif rates_2004D
         f(27)  = 5.216e6 * t9m23*exp(-12.827/t913) * (1. -0.235*t9 +0.041*t92 -0.002*t93)
 #elif rates_2004C
@@ -659,17 +749,17 @@ CONTAINS
         IF (BindingVariation) THEN
         DO reaction = 13, 34
             IF (q9(reaction) /= reacpr(reaction, 8)) THEN
-                IF((iform(reaction).eq.3).or.(iform(reaction).eq.5).or.(iform(reaction).eq.6)) THEN
+                select case (iform(reaction))
+                case (3, 4, 5, 6)
 #if include_gamow_shift
                     f(reaction) = f(reaction) * (1.0 + 0.5 * (1. + sqrt(EgOut(reaction)/reacpr(reaction, 8))) &
                                   * (q9(reaction) - reacpr(reaction, 8))/reacpr(reaction, 8))
 #else
                     f(reaction) = f(reaction) * (1.0 + 0.5 * (q9(reaction) - reacpr(reaction, 8))/reacpr(reaction, 8))
 #endif
-                ELSE IF((iform(reaction).eq.2).or. &
-                        (iform(reaction).eq.7).or.(iform(reaction).eq.8)) THEN
+                case (1, 2, 7, 8)
                     f(reaction) = f(reaction) * (1.0 + 3.0 * (q9(reaction) - reacpr(reaction, 8))/reacpr(reaction, 8))
-                END IF
+                end select
             END IF
         END DO
         END IF
@@ -677,15 +767,20 @@ CONTAINS
         IF (BindingVariation) THEN
         DO reaction = 13, 34
             IF (q9(reaction) .le. 0.0) THEN
-                f(reaction) = 0.0;
+                f(reaction) = 0.0
             ELSE IF (q9(reaction) /= reacpr(reaction, 8)) THEN
-                IF((iform(reaction).eq.3).or.(iform(reaction).eq.5).or.(iform(reaction).eq.6)) THEN
+                select case (iform(reaction))
+                case (3, 4, 5, 6)
+#if include_gamow_shift
+                    f(reaction) = f(reaction) * sqrt(q9(reaction)/reacpr(reaction, 8)) &
+                                  * exp(-sqrt(EgOut(reaction)/q9(reaction)) + sqrt(EgOut(reaction)/reacpr(reaction, 8)))
+#else
                     f(reaction) = f(reaction) * sqrt(q9(reaction)/reacpr(reaction, 8))
-                ELSE IF((iform(reaction).eq.2).or. &
-                        (iform(reaction).eq.7).or.(iform(reaction).eq.8)) THEN
+#endif
+                case (1, 2, 7, 8)
                     temp = q9(reaction)/reacpr(reaction, 8)
                     f(reaction) = f(reaction) * temp * temp * temp
-                END IF
+                end select
             END IF
         END DO
         END IF
