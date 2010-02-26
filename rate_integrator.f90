@@ -189,7 +189,7 @@ CONTAINS
             delta_Er(reaction) = dEr
         else
             Sparameters(reaction, pEr) = Sparameters(reaction, pEr) + dEr
-            Sparameters(reaction, pG) = Sparameters(reaction, pG) + dG
+            Sparameters(reaction, pG) = Sparameters(reaction, pG) * (1. + dG)
         end if
     end subroutine
 

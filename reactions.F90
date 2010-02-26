@@ -347,6 +347,24 @@ CONTAINS
 #endif
     END SUBROUTINE
 
+    SUBROUTINE SetHe5ResonanceWidth(dG)
+        ! Shift resonances due to He5
+        REAL, INTENT(IN) :: dG
+!  6    t(d,n)4He
+#if integrate_30
+        call VaryResonance(6, 0.0, dG)
+#endif
+    END SUBROUTINE
+
+    SUBROUTINE SetLi5ResonanceWidth(dG)
+        ! Shift resonances due to Li5
+        REAL, INTENT(IN) :: dG
+!  7  3He(d,p)4He
+#if integrate_31
+        call VaryResonance(7, 0.0, dG)
+#endif
+    END SUBROUTINE
+
 
     SUBROUTINE PrintQValues
         ! Print Q and dQ for all reactions

@@ -26,17 +26,19 @@ PROGRAM bbn
     ct = 0.01
     inc = 10
 
-!    CALL GetLinearResponse
-    CALL VaryLightQuarkMass
+    CALL GetLinearResponse
+!    CALL VaryLightQuarkMass
 
     if(.false.) then
         call InitialiseReactions
 !        call SetDeutronBindingVariation(-0.538)
 !        CALL SetHe5ResonancePositions(0.1)
 
-        ln_mq = 0.027
+        ln_mq = -0.04
         !CALL SetDeutronBindingVariation(ln_mq * (-1.39) * 25.8)   ! AV18
         !CALL SetHe5ResonancePositions(ln_mq * 17.59) ! delta E_r in MeV
+        CALL SetLi5ResonancePositions(ln_mq * 1.43) ! delta E_r in MeV
+        CALL SetHe5ResonancePositions(ln_mq * 0.81) ! delta E_r in MeV
 
         itime = 3       !Time = before computation
         CALL check
@@ -114,19 +116,19 @@ SUBROUTINE GetLinearResponse
     INTEGER :: i, j
 !    REAL :: lnvar, lnvar_step
     REAL:: lnvar_step
-    INTEGER, PARAMETER :: numsteps = 31
+    INTEGER, PARAMETER :: numsteps = 5
     REAL, DIMENSION(numsteps, 6) :: lnY
-    REAL :: dlnYdlnX, X0
+    REAL :: dlnYdlnX, X0, binding_energy
 
     OPEN (unit=7, file='bbn.dat', status='unknown')
     write (7, "('eta  var  D  3He  4He  6Li  7Li  7Be  7Li+7Be')")
 
-    lnvar = -0.3
+    lnvar = -0.02
     lnvar_step = 2.0 * abs(lnvar) / (numsteps - 1)
 !    lnvar = -1.82
 !    lnvar_step = 0.2
 
-    X0 = 100.
+    X0 = 1.0
 
 !    do j = 10, 80, 5
 !        eta = j/10.0 * 1.e-10
@@ -138,9 +140,30 @@ SUBROUTINE GetLinearResponse
         CALL InitialiseReactions
 
 !        CALL SetDeutronBindingVariation(lnvar)
+!        CALL SetDeutronBindingVariation(lnvar * (-1.39) * 25.8)   ! AV18
+!        CALL SetBindingVariation(4, lnvar * (-1.44) * 98.39)  ! 3H = T
+!        CALL SetBindingVariation(5, lnvar * (-1.55) * 89.53)  ! 3He
+!        CALL SetBindingVariation(6, lnvar * (-1.08) * 328.2)  ! 4He
+!        CALL SetBindingVariation(7, lnvar * (-1.36) * 371.1)  ! 6Li
+!        CALL SetBindingVariation(8, lnvar * (-1.50) * 455.2)  ! 7Li
+!        CALL SetBindingVariation(9, lnvar * (-1.57) * 436.2)  ! 7Be
+!        do j = 10, 11
+!            binding_energy = (zm(j)*km(2) + (am(j)-zm(j))*km(1) - km(j))/1000./kB
+!            CALL SetBindingVariation(j, lnvar * (-1.45) * binding_energy)
+!        end do
+!        CALL SetBindingVariation(12, lnvar * (-1.59) * 674.7) ! 9Be
+!        do j = 13, 26
+!            binding_energy = (zm(j)*km(2) + (am(j)-zm(j))*km(1) - km(j))/1000./kB
+!            CALL SetBindingVariation(j, lnvar * (-1.45) * binding_energy)
+!        end do
+
 !        CALL SetBindingVariation(4, lnvar)
 !        c(2) = 889.0 * (1.0 + lnvar)
-        CALL SetLi5ResonancePositions(lnvar)
+
+!        CALL SetLi5ResonancePositions(lnvar * 7.32) ! delta E_r in MeV
+!        CALL SetHe5ResonancePositions(lnvar * 8.29) ! delta E_r in MeV
+!        CALL SetLi5ResonanceWidth(lnvar) ! % change in Gamma
+!        CALL SetHe5ResonanceWidth(lnvar) !
 
         itime = 3       !Time = before computation
         CALL check
@@ -178,7 +201,7 @@ SUBROUTINE GetLinearResponse
     DO i = 1, 6
         dlnYdlnX = (2./3.*(lnY(4,i) - lnY(2,i)) - 1./12.*(lnY(5,i) - lnY(1,i)))/lnvar_step * X0
         write(*, "(i2, ' dlnY/dlnX = ', f8.3, ' (', f7.5,')'))") &
-            i, dlnYdlnX, abs((lnY(5,i) - lnY(1, i))/4./lnvar_step*X0 - dlnYdlnX) 
+            i, dlnYdlnX, abs((lnY(5,i) - lnY(3, i))/2./lnvar_step*X0 - dlnYdlnX) 
     END DO
     end if
 END SUBROUTINE
@@ -195,7 +218,7 @@ SUBROUTINE VaryLightQuarkMass
 
     INTEGER :: i, j
     REAL :: ln_mq, ln_mq_step   ! d(m_q)/m_q and its step size
-    INTEGER, PARAMETER :: numsteps = 41
+    INTEGER, PARAMETER :: numsteps = 2
     REAL :: binding_energy
 
     OPEN (unit=7, file='bbn.dat', status='unknown')
@@ -226,10 +249,10 @@ SUBROUTINE VaryLightQuarkMass
             CALL SetBindingVariation(j, ln_mq * (-1.45) * binding_energy)
         end do
 
-        CALL SetLi5ResonancePositions(ln_mq * 17.59) ! delta E_r in MeV
-        CALL SetHe5ResonancePositions(ln_mq * 18.68) ! delta E_r in MeV
-!        CALL SetLi5ResonancePositions(ln_mq * 7.32) ! delta E_r in MeV
-!        CALL SetHe5ResonancePositions(ln_mq * 8.29) ! delta E_r in MeV
+!        CALL SetLi5ResonancePositions(ln_mq * 17.59) ! delta E_r in MeV
+!        CALL SetHe5ResonancePositions(ln_mq * 18.68) ! delta E_r in MeV
+        CALL SetLi5ResonancePositions(ln_mq * 7.32) ! delta E_r in MeV
+        CALL SetHe5ResonancePositions(ln_mq * 8.29) ! delta E_r in MeV
 
 !        CALL PrintQValues
 
