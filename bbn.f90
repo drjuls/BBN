@@ -26,10 +26,10 @@ PROGRAM bbn
     ct = 0.01
     inc = 10
 
-    CALL GetLinearResponse
+!    CALL GetLinearResponse
 !    CALL VaryLightQuarkMass
 
-    if(.false.) then
+    if(.true.) then
         call InitialiseReactions
 !        call SetDeutronBindingVariation(-0.538)
 !        CALL SetHe5ResonancePositions(0.1)
@@ -37,19 +37,19 @@ PROGRAM bbn
         ln_mq = -0.04
         !CALL SetDeutronBindingVariation(ln_mq * (-1.39) * 25.8)   ! AV18
         !CALL SetHe5ResonancePositions(ln_mq * 17.59) ! delta E_r in MeV
-        CALL SetLi5ResonancePositions(ln_mq * 1.43) ! delta E_r in MeV
-        CALL SetHe5ResonancePositions(ln_mq * 0.81) ! delta E_r in MeV
+        !CALL SetLi5ResonancePositions(ln_mq * 1.43) ! delta E_r in MeV
+        !CALL SetHe5ResonancePositions(ln_mq * 0.81) ! delta E_r in MeV
 
         itime = 3       !Time = before computation
         CALL check
 
-        CALL DriverRK4        !Do nucleosynthesis computation.
+        CALL DriverRK2        !Do nucleosynthesis computation.
 
         itime = 8       !Time = after computation
         CALL check
 
         print *, it
-        write (*, "(1p8(e14.5))") t9out(it), (xout(it,3)), (xout(it,4)), (xout(it,5)), &
+        write (*, "(1p,8(e14.5))") t9out(it), (xout(it,3)), (xout(it,4)), (xout(it,5)), &
                                   (xout(it,6)), (xout(it,7)), (xout(it,8)), (xout(it,9))
     end if
 
@@ -174,10 +174,10 @@ SUBROUTINE GetLinearResponse
         CALL check
 
         ! dQ, T9, D, 3He, 4He, 7Li, 7Be
-        write (*, "(1p7(e14.5))") lnvar, t9out(it), xout(it,3), xout(it,5), xout(it,6), xout(it,8), xout(it,9)
+        write (*, "(1p,7(e14.5))") lnvar, t9out(it), xout(it,3), xout(it,5), xout(it,6), xout(it,8), xout(it,9)
 
         ! eta, dQ, D, 3He, 4He, 6Li, 7Li, 7Be, 7Li+7Be
-        write (7, "(1p9(e14.5))") eta, lnvar, (xout(it,3)), (xout(it,5)), &
+        write (7, "(1p,9(e14.5))") eta, lnvar, (xout(it,3)), (xout(it,5)), &
                                   (xout(it,6)), (xout(it,7)), (xout(it,8)), (xout(it,9)), &
                                   (xout(it,8) + xout(it,9))
 !        write (7, "(1p9(e14.5))") eta*1.e10, lnvar, xout(it,3)*1.e5, xout(it,5)*1.e6, xout(it,6), &
@@ -265,10 +265,10 @@ SUBROUTINE VaryLightQuarkMass
         CALL check
 
         ! d(m_q)/m_q, T9, D, 3He, 4He, 6Li, 7Li
-        write (7, "(1p7(e14.5))") ln_mq, (xout(it,3)), (xout(it,5)), &
+        write (7, "(1p,7(e14.5))") ln_mq, (xout(it,3)), (xout(it,5)), &
                                   (xout(it,6)), (xout(it,7)), (xout(it,8))
 
-        write (*, "(1p9(e14.5))") ln_mq, t9out(it), (xout(it,3)), (xout(it,4)), (xout(it,5)), &
+        write (*, "(1p,9(e14.5))") ln_mq, t9out(it), (xout(it,3)), (xout(it,4)), (xout(it,5)), &
                                   (xout(it,6)), (xout(it,7)), (xout(it,8)), (xout(it,9))
 
         ln_mq = ln_mq + ln_mq_step

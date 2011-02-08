@@ -28,7 +28,7 @@ MODULE reactions_module
 #define rate27_2008_refit 1
 
 ! Integrate the cross-section explicitly for each value of T
-#define integrate_rates 1
+#define integrate_rates 0
 #if integrate_rates
     use rate_integrator
 !  1    p(n,g)d

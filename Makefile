@@ -1,7 +1,7 @@
 FORTRAN = gfortran
 FLAGS = -fdefault-real-8
 F77FLAGS = $(FLAGS) -ffixed-line-length-none
-F90FLAGS = $(FLAGS) -fimplicit-none
+F90FLAGS = $(FLAGS) -fimplicit-none -cpp
 
 modules = bessel.o phys_parameters.o comp_parameters.o variables.o \
           scalpot.o universe.o rate_integrator.o reactions.o
