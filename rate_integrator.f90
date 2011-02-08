@@ -241,7 +241,7 @@ CONTAINS
             print *, " integral = ", integral, " abserr = ", abserr
             print *, "    neval = ", neval,    "   last = ", last
             print *,  "parameters: reaction = ", reaction
-            write(*,"(1p8(e14.5))"), f_params
+            write(*,"(1p,8(e14.5))"), f_params
 !            stop
         end if
 
